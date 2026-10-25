@@ -107,18 +107,23 @@ export function useLivePose(
             bitmap.close();
             return;
           }
-          const { landmarks, worldLandmarks } = await client.detectWithWorld(bitmap, now);
+          const detection = await client.detectWithWorld(bitmap, now);
           if (!active) return;
           const frame: Frame = {
             time: now / 1000,
-            landmarks,
-            worldLandmarks,
-            angle: measureFrame(landmarks, exercise, side, video.videoWidth, video.videoHeight),
+            ...detection,
+            angle: measureFrame(
+              detection.landmarks,
+              exercise,
+              side,
+              video.videoWidth,
+              video.videoHeight,
+            ),
           };
           lastFrame.current = frame;
           callback.current(frame, now);
           setAngle(frame.angle);
-          setState(landmarks.length ? 'tracking' : 'searching');
+          setState(detection.landmarks.length ? 'tracking' : 'searching');
         } catch (cause) {
           if (active) {
             ready = false;

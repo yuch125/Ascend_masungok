@@ -1,7 +1,7 @@
 /// <reference lib="webworker" />
-import { FilesetResolver, PoseLandmarker } from '@mediapipe/tasks-vision';
+import { FilesetResolver, HolisticLandmarker } from '@mediapipe/tasks-vision';
 import { bodyOnlyLandmarks } from './bodyLandmarks';
-let model: PoseLandmarker | undefined;
+let model: HolisticLandmarker | undefined;
 self.onmessage = async ({
   data,
 }: MessageEvent<
@@ -14,16 +14,17 @@ self.onmessage = async ({
         new URL('/mediapipe', self.location.origin).href,
         true,
       );
-      model = await PoseLandmarker.createFromOptions(vision, {
+      model = await HolisticLandmarker.createFromOptions(vision, {
         baseOptions: {
-          modelAssetPath: new URL('/models/pose_landmarker_lite.task', self.location.origin).href,
+          modelAssetPath: new URL('/models/holistic_landmarker.task', self.location.origin).href,
           delegate: 'CPU',
         },
         runningMode: 'VIDEO',
-        numPoses: 1,
         minPoseDetectionConfidence: 0.5,
         minPosePresenceConfidence: 0.5,
-        minTrackingConfidence: 0.5,
+        minHandLandmarksConfidence: 0.5,
+        minFaceDetectionConfidence: 0.5,
+        minFacePresenceConfidence: 0.5,
       });
       self.postMessage({ id: data.id, type: 'ready' });
     } else if (data.type === 'frame' && model) {
@@ -32,8 +33,12 @@ self.onmessage = async ({
         self.postMessage({
           id: data.id,
           type: 'result',
-          landmarks: bodyOnlyLandmarks(result.landmarks[0] ?? []),
-          worldLandmarks: bodyOnlyLandmarks(result.worldLandmarks[0] ?? []),
+          landmarks: bodyOnlyLandmarks(result.poseLandmarks[0] ?? []),
+          worldLandmarks: bodyOnlyLandmarks(result.poseWorldLandmarks[0] ?? []),
+          leftHandLandmarks: result.leftHandLandmarks[0] ?? [],
+          leftHandWorldLandmarks: result.leftHandWorldLandmarks[0] ?? [],
+          rightHandLandmarks: result.rightHandLandmarks[0] ?? [],
+          rightHandWorldLandmarks: result.rightHandWorldLandmarks[0] ?? [],
         });
       } finally {
         data.bitmap.close();

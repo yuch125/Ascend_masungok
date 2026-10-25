@@ -4,8 +4,18 @@ import { FBXLoader } from 'three/examples/jsm/loaders/FBXLoader.js';
 import type { Exercise, Frame, Landmark, Side } from '../types';
 
 export type PoseAvatarView = 'front' | 'side' | 'back' | 'angle';
-type Rig = { bone: THREE.Bone; rest: THREE.Quaternion; direction: THREE.Vector3 };
+type Rig = {
+  bone: THREE.Bone;
+  rest: THREE.Quaternion;
+  direction: THREE.Vector3;
+  normal: THREE.Vector3;
+};
 type PosePoint = { position: THREE.Vector3; confidence: number };
+type HandOrientation = {
+  forward: THREE.Vector3;
+  normal: THREE.Vector3;
+  confidence: number;
+};
 type DirectionState = {
   direction: THREE.Vector3;
   raw: THREE.Vector3;
@@ -56,9 +66,14 @@ function point(
   index: number,
   mirrored: boolean,
   worldSpace: boolean,
+  trustDetected = false,
 ): PosePoint | null {
   const landmark = landmarks[index];
-  const confidence = Math.min(landmark?.visibility ?? 0, landmark?.presence ?? 1);
+  const visibility = landmark?.visibility ?? (trustDetected ? 1 : 0);
+  const confidence = Math.min(
+    visibility > 0 || !trustDetected ? visibility : 1,
+    landmark?.presence ?? 1,
+  );
   if (
     !landmark ||
     confidence < 0.65 ||
@@ -106,6 +121,44 @@ function getPose(frame: Frame | undefined, mirrored: boolean) {
     rightArm: [rightShoulder, p(14), p(16), p(20)],
     leftLeg: [leftHip, p(25), p(27), p(31)],
     rightLeg: [rightHip, p(26), p(28), p(32)],
+  };
+}
+
+/** Recover wrist roll from the palm plane: wrist→middle MCP plus index↔pinky MCP. */
+function getHandOrientation(
+  frame: Frame | undefined,
+  side: 'left' | 'right',
+  mirrored: boolean,
+): HandOrientation | null {
+  const world = side === 'left' ? frame?.leftHandWorldLandmarks : frame?.rightHandWorldLandmarks;
+  const image = side === 'left' ? frame?.leftHandLandmarks : frame?.rightHandLandmarks;
+  const useWorld = !!world?.length;
+  const landmarks = useWorld ? (world ?? []) : (image ?? []);
+  const p = (index: number) => point(landmarks, index, mirrored, useWorld, true);
+  const wrist = p(0);
+  const indexMcp = p(5);
+  const middleMcp = p(9);
+  const pinkyMcp = p(17);
+  if (!wrist || !indexMcp || !middleMcp || !pinkyMcp) return null;
+
+  const forward = middleMcp.position.clone().sub(wrist.position);
+  const across =
+    side === 'left'
+      ? pinkyMcp.position.clone().sub(indexMcp.position)
+      : indexMcp.position.clone().sub(pinkyMcp.position);
+  if (forward.lengthSq() < 1e-7 || across.lengthSq() < 1e-7) return null;
+  forward.normalize();
+  const normal = new THREE.Vector3().crossVectors(forward, across).normalize();
+  if (normal.lengthSq() < 1e-7) return null;
+  return {
+    forward,
+    normal,
+    confidence: Math.min(
+      wrist.confidence,
+      indexMcp.confidence,
+      middleMcp.confidence,
+      pinkyMcp.confidence,
+    ),
   };
 }
 
@@ -284,6 +337,7 @@ export function PoseAvatar3D({
     // Landmark updates arrive at about 10–12 fps and have unavoidable pixel/depth noise.
     // Smooth directions (not absolute positions) so body translations do not make the rig lag.
     const trackedDirections = new Map<string, DirectionState>();
+    const trackedHands = new Map<string, THREE.Quaternion>();
     let observedFrameTime = Number.NaN;
     let avatarRoot: THREE.Group | undefined;
     let avatarBaseY = 0;
@@ -321,11 +375,15 @@ export function PoseAvatar3D({
             (item): item is THREE.Bone => item instanceof THREE.Bone,
           );
           if (!bone || !child) return;
-          rig.set(key, {
-            bone,
-            rest: bone.quaternion.clone(),
-            direction: child.position.clone().normalize().applyQuaternion(bone.quaternion),
-          });
+          const rest = bone.quaternion.clone();
+          const direction = child.position.clone().normalize().applyQuaternion(rest);
+          let normal = new THREE.Vector3(0, 0, 1).applyQuaternion(rest);
+          normal.addScaledVector(direction, -normal.dot(direction));
+          if (normal.lengthSq() < 1e-6) {
+            normal = new THREE.Vector3(0, 1, 0).applyQuaternion(rest);
+            normal.addScaledVector(direction, -normal.dot(direction));
+          }
+          rig.set(key, { bone, rest, direction, normal: normal.normalize() });
         };
         bind('spine', ['spine']);
         bind('neck', ['neck']);
@@ -439,6 +497,44 @@ export function PoseAvatar3D({
       const wanted = correction.multiply(item.rest);
       item.bone.quaternion.slerp(wanted, 0.12);
     };
+    const applyHand = (
+      key: string,
+      orientation: HandOrientation | null,
+      fallbackStart: PosePoint | null,
+      fallbackEnd: PosePoint | null,
+      isNewLandmarkFrame: boolean,
+      sampleTime: number,
+    ) => {
+      const item = rig.get(key);
+      if (!item || !orientation) {
+        apply(key, fallbackStart, fallbackEnd, isNewLandmarkFrame, sampleTime);
+        return;
+      }
+      const parentQuaternion = new THREE.Quaternion();
+      item.bone.parent?.getWorldQuaternion(parentQuaternion);
+      const inverseParent = parentQuaternion.invert();
+      const targetForward = orientation.forward.clone().applyQuaternion(inverseParent).normalize();
+      const targetNormal = orientation.normal.clone().applyQuaternion(inverseParent);
+      targetNormal.addScaledVector(targetForward, -targetNormal.dot(targetForward)).normalize();
+
+      const swing = new THREE.Quaternion().setFromUnitVectors(item.direction, targetForward);
+      const swungNormal = item.normal.clone().applyQuaternion(swing);
+      swungNormal.addScaledVector(targetForward, -swungNormal.dot(targetForward)).normalize();
+      const signedRoll = Math.atan2(
+        targetForward.dot(new THREE.Vector3().crossVectors(swungNormal, targetNormal)),
+        THREE.MathUtils.clamp(swungNormal.dot(targetNormal), -1, 1),
+      );
+      const twist = new THREE.Quaternion().setFromAxisAngle(targetForward, signedRoll);
+      const wanted = twist.multiply(swing).multiply(item.rest);
+      let stable = trackedHands.get(key);
+      if (!stable) {
+        stable = wanted.clone();
+        trackedHands.set(key, stable);
+      } else if (isNewLandmarkFrame) {
+        stable.rotateTowards(wanted, 0.16 + orientation.confidence * 0.14);
+      }
+      item.bone.quaternion.slerp(stable, 0.14);
+    };
     const updateFootSupport = (pose: ReturnType<typeof getPose>, isNewFrame: boolean) => {
       if (!isNewFrame) return;
       const leftY = pose.leftLeg[2]?.position.y ?? pose.leftLeg[3]?.position.y;
@@ -527,11 +623,25 @@ export function PoseAvatar3D({
       apply(`${left}Shoulder`, pose.chest, pose.leftArm[0], isNewLandmarkFrame, sampleTime);
       apply(`${left}Arm`, pose.leftArm[0], pose.leftArm[1], isNewLandmarkFrame, sampleTime);
       apply(`${left}ForeArm`, pose.leftArm[1], pose.leftArm[2], isNewLandmarkFrame, sampleTime);
-      apply(`${left}Hand`, pose.leftArm[2], pose.leftArm[3], isNewLandmarkFrame, sampleTime);
+      applyHand(
+        `${left}Hand`,
+        getHandOrientation(frameRef.current, 'left', mirrored),
+        pose.leftArm[2],
+        pose.leftArm[3],
+        isNewLandmarkFrame,
+        sampleTime,
+      );
       apply(`${right}Shoulder`, pose.chest, pose.rightArm[0], isNewLandmarkFrame, sampleTime);
       apply(`${right}Arm`, pose.rightArm[0], pose.rightArm[1], isNewLandmarkFrame, sampleTime);
       apply(`${right}ForeArm`, pose.rightArm[1], pose.rightArm[2], isNewLandmarkFrame, sampleTime);
-      apply(`${right}Hand`, pose.rightArm[2], pose.rightArm[3], isNewLandmarkFrame, sampleTime);
+      applyHand(
+        `${right}Hand`,
+        getHandOrientation(frameRef.current, 'right', mirrored),
+        pose.rightArm[2],
+        pose.rightArm[3],
+        isNewLandmarkFrame,
+        sampleTime,
+      );
       apply(`${left}UpLeg`, leftLeg[0], leftLeg[1], isNewLandmarkFrame, sampleTime);
       apply(`${left}Leg`, leftLeg[1], leftLeg[2], isNewLandmarkFrame, sampleTime);
       apply(`${left}Foot`, leftLeg[2], leftToe, isNewLandmarkFrame, sampleTime, true);

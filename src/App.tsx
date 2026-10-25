@@ -297,25 +297,34 @@ export default function App() {
     setCompose(draft.session ?? 'new');
   }
   async function removeSession(session: Session) {
+    const linkedCapture = dataRef.current.captures.find((capture) => capture.id === session.id);
+    const mediaIds = new Set(
+      [session.mediaId, linkedCapture?.mediaId].filter((id): id is string => !!id),
+    );
     await update((current) => ({
       ...current,
       sessions: current.sessions.filter((s) => s.id !== session.id),
       captures: current.captures.filter((capture) => capture.id !== session.id),
     }));
-    if (session.mediaId) await deleteMedia(userId, session.mediaId);
+    for (const mediaId of mediaIds) await deleteMedia(userId, mediaId);
     setDetail(undefined);
     setToast(
       '기록과 기기에 보관한 영상을 삭제했어요. 별도로 공유한 게시글은 커뮤니티에서 관리할 수 있어요.',
     );
   }
   async function removeCapture(capture: CaptureRecord) {
+    const linkedSession = dataRef.current.sessions.find((session) => session.id === capture.id);
+    const mediaIds = new Set(
+      [capture.mediaId, linkedSession?.mediaId].filter((id): id is string => !!id),
+    );
     await update((current) => ({
       ...current,
       captures: current.captures.filter((item) => item.id !== capture.id),
       sessions: current.sessions.filter((item) => item.id !== capture.id),
     }));
-    if (capture.mediaId) await deleteMedia(userId, capture.mediaId);
+    for (const mediaId of mediaIds) await deleteMedia(userId, mediaId);
     navigate('home');
+    setToast('촬영 기록과 기기에 보관한 영상을 삭제했어요.');
   }
   async function refreshPosts(localPosts?: Post[]) {
     const account = userId;
@@ -387,7 +396,8 @@ export default function App() {
     link.click();
     setTimeout(() => URL.revokeObjectURL(url), 1000);
   }
-  const firstSetup = ready && !data.symptoms;
+  // The setup opens on Home until completed, but the other tabs remain reachable.
+  const firstSetup = ready && !data.symptoms && tab === 'home';
   const onboarding = ready && (firstSetup || !!editingRehabGoalId);
   return (
     <AppErrorContext.Provider value={actionError}>
@@ -441,7 +451,11 @@ export default function App() {
               )}
             </div>
           ) : firstSetup ? (
-            <RehabSetup busy={busy} onSave={(value) => void run(() => saveInitialSetup(value))} />
+            <RehabSetup
+              busy={busy}
+              onNavigate={navigate}
+              onSave={(value) => void run(() => saveInitialSetup(value))}
+            />
           ) : editingRehabGoalId ? (
             <RehabSetup
               key={editingRehabGoalId}
@@ -623,7 +637,7 @@ export default function App() {
             </AnimatePresence>
           )}
         </main>
-        {ready && !onboarding && !exerciseId && (
+        {ready && !onboarding && (
           <nav className="bottom-nav" aria-label="주 메뉴">
             {navigation.map((item) => (
               <button
@@ -719,16 +733,26 @@ export default function App() {
             userId={userId}
             busy={busy}
             onClose={() => setDetail(undefined)}
+            onNavigate={(next) => {
+              setDetail(undefined);
+              navigate(next);
+            }}
             onDelete={() => void run(() => removeSession(detail))}
-            onShare={() => {
-              setComposeMedia(undefined);
-              setComposeCaption('');
+            onShare={(media) => {
+              setComposeMedia(media);
+              setComposeCaption(`${getExercise(detail.exerciseId).name} 기록을 공유해요.`);
               setCompose(detail);
               setDetail(undefined);
             }}
             onRemoveVideo={() =>
               void run(async () => {
-                if (detail.mediaId) await deleteMedia(userId, detail.mediaId);
+                const linkedCapture = dataRef.current.captures.find(
+                  (capture) => capture.id === detail.id,
+                );
+                const mediaIds = new Set(
+                  [detail.mediaId, linkedCapture?.mediaId].filter((id): id is string => !!id),
+                );
+                for (const mediaId of mediaIds) await deleteMedia(userId, mediaId);
                 const updated = { ...detail, mediaId: undefined };
                 await update((current) => ({
                   ...current,
@@ -738,6 +762,7 @@ export default function App() {
                   ),
                 }));
                 setDetail(updated);
+                setToast('기기에 보관한 원본 영상만 삭제했어요. 분석 기록은 그대로 남아 있어요.');
               })
             }
           />

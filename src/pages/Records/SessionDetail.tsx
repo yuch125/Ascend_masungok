@@ -1,7 +1,7 @@
 import { lazy, Suspense, useEffect, useState } from 'react';
 import { ArrowLeft, ArrowRight, LockKeyhole, Trash2 } from 'lucide-react';
 import AscendBottomNav from '../../components/AscendBottomNav';
-import type { Plan, Session } from '../../types';
+import type { Plan, Session, Tab } from '../../types';
 import { readMedia } from '../../services/local';
 import { getExercise } from '../../features/exercise-tracking/exercises';
 import { RangeChart, TimelineChart } from '../../components/Charts';
@@ -30,6 +30,7 @@ export default function SessionDetail({
   userId,
   busy,
   onClose,
+  onNavigate,
   onDelete,
   onShare,
   onRemoveVideo,
@@ -40,11 +41,13 @@ export default function SessionDetail({
   userId: string;
   busy: boolean;
   onClose: () => void;
-  onDelete: () => void;
-  onShare: () => void;
+  onNavigate: (tab: Tab) => void;
+  onDelete: () => void | Promise<void>;
+  onShare: (media?: Blob) => void;
   onRemoveVideo: () => void;
 }) {
   const [url, setUrl] = useState('');
+  const [media, setMedia] = useState<Blob>();
   const [confirm, setConfirm] = useState(false);
   const [view, setView] = useState<'video' | '3d'>('video');
   const previous = previousSession(session, sessions);
@@ -63,11 +66,13 @@ export default function SessionDetail({
     let active = true;
     let objectUrl = '';
     setUrl('');
+    setMedia(undefined);
     if (session.mediaId)
       readMedia(userId, session.mediaId).then((blob) => {
         if (blob && active) {
           objectUrl = URL.createObjectURL(blob);
           setUrl(objectUrl);
+          setMedia(blob);
         }
       });
     return () => {
@@ -220,11 +225,11 @@ export default function SessionDetail({
         </details>
         <p className="ascend-disclaimer">측정값은 2D 영상 기준 참고용이며 진단이 아니에요.</p>
         <button type="button" className="ascend-primary feedback-record-button" onClick={onClose}>
-          기록에서 자세히 보기
+          내 기록으로 돌아가기
         </button>
         <div className="button-row feedback-actions">
-          <button className="primary" onClick={onShare}>
-            선택 공유 <ArrowRight size={16} />
+          <button className="primary" onClick={() => onShare(media)} disabled={busy}>
+            내 기록을 커뮤니티에 공유 <ArrowRight size={16} />
           </button>
           {url && (
             <button className="secondary" onClick={onRemoveVideo} disabled={busy}>
@@ -239,14 +244,14 @@ export default function SessionDetail({
           <div className="delete-confirm">
             <span>기록과 이 기기에 보관된 영상을 삭제할까요?</span>
             <button className="danger-text text-button" disabled={busy} onClick={onDelete}>
-              삭제
+              {busy ? '삭제 중…' : '삭제'}
             </button>
             <button className="text-button" onClick={() => setConfirm(false)}>
               취소
             </button>
           </div>
         )}
-        <AscendBottomNav active="records" />
+        <AscendBottomNav active="records" onNavigate={onNavigate} />
       </div>
     </Modal>
   );

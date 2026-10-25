@@ -54,13 +54,14 @@ describe('browser account separation and original video retention', () => {
       restored.sessions[0].analysis.frames,
       restored.captures[0].frames!,
     ]) {
-      expect(recordFrames[0].landmarks.slice(0, 11)).toEqual(Array(11).fill(null));
+      expect(recordFrames[0].landmarks[0]).toEqual(points[0]);
+      expect(recordFrames[0].landmarks.slice(1, 11)).toEqual(Array(10).fill(null));
       expect(recordFrames[0].landmarks[25]).toEqual(points[25]);
     }
     expect(restored.sessions[0].mediaId).toBe('original');
     expect(restored.sessions[0].analysis.min).toBe(90);
     const migrated = await database.get('data', 'legacy-face-records');
-    expect(migrated.sessions[0].analysis.frames[0].landmarks[0]).toBeNull();
+    expect(migrated.sessions[0].analysis.frames[0].landmarks[0]).toEqual(points[0]);
     await writeData('new-face-records', data);
     const written = await database.get('data', 'new-face-records');
     expect(written.captures[0].frames[0].landmarks[10]).toBeNull();

@@ -53,9 +53,8 @@ describe('four-tab mobile journey', () => {
       false,
     );
     expect(screen.getByRole('button', { name: '오른쪽 무릎' })).toBeDefined();
-    expect(screen.queryByRole('navigation')).toBeNull();
-    await user.click(screen.getByRole('button', { name: '촬영 화면 닫기' }));
-    await user.click(screen.getByRole('button', { name: '더보기' }));
+    const captureNav = screen.getByRole('navigation', { name: '주 메뉴' });
+    await user.click(within(captureNav).getByRole('button', { name: '더보기' }));
     await user.click(screen.getByRole('button', { name: '내 증상 / 불편함 수정' }));
     await user.clear(screen.getByLabelText('내 증상 / 불편함'));
     await user.type(

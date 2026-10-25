@@ -1,11 +1,27 @@
-import type { PoseLandmarks } from '../../types';
+import type { HandLandmarks, PoseLandmarks } from '../../types';
 import { bodyOnlyLandmarks } from './bodyLandmarks';
 
 type Reply =
   | { id: number; type: 'ready' }
-  | { id: number; type: 'result'; landmarks: PoseLandmarks; worldLandmarks?: PoseLandmarks }
+  | {
+      id: number;
+      type: 'result';
+      landmarks: PoseLandmarks;
+      worldLandmarks?: PoseLandmarks;
+      leftHandLandmarks?: HandLandmarks;
+      leftHandWorldLandmarks?: HandLandmarks;
+      rightHandLandmarks?: HandLandmarks;
+      rightHandWorldLandmarks?: HandLandmarks;
+    }
   | { id: number; type: 'error'; message: string };
-export type PoseDetection = { landmarks: PoseLandmarks; worldLandmarks: PoseLandmarks };
+export type PoseDetection = {
+  landmarks: PoseLandmarks;
+  worldLandmarks: PoseLandmarks;
+  leftHandLandmarks: HandLandmarks;
+  leftHandWorldLandmarks: HandLandmarks;
+  rightHandLandmarks: HandLandmarks;
+  rightHandWorldLandmarks: HandLandmarks;
+};
 export class PoseClient {
   private worker: Worker;
   private nextId = 0;
@@ -77,6 +93,10 @@ export class PoseClient {
       return {
         landmarks: bodyOnlyLandmarks(response.landmarks),
         worldLandmarks: bodyOnlyLandmarks(response.worldLandmarks ?? []),
+        leftHandLandmarks: response.leftHandLandmarks ?? [],
+        leftHandWorldLandmarks: response.leftHandWorldLandmarks ?? [],
+        rightHandLandmarks: response.rightHandLandmarks ?? [],
+        rightHandWorldLandmarks: response.rightHandWorldLandmarks ?? [],
       };
     } catch (error) {
       try {

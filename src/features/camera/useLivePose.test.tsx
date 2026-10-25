@@ -54,10 +54,26 @@ it('tracks automatically on an open preview, timestamps capture before inference
   }));
   points[23].y = 0.2;
   points[27].x = 0.8;
+  const hands = points.slice(0, 21);
   let respond!: (points: Landmark[]) => void;
   mocks.detectWithWorld.mockReturnValue(
-    new Promise<{ landmarks: Landmark[]; worldLandmarks: Landmark[] }>((resolve) => {
-      respond = (landmarks) => resolve({ landmarks, worldLandmarks: landmarks });
+    new Promise<{
+      landmarks: Landmark[];
+      worldLandmarks: Landmark[];
+      leftHandLandmarks: Landmark[];
+      leftHandWorldLandmarks: Landmark[];
+      rightHandLandmarks: Landmark[];
+      rightHandWorldLandmarks: Landmark[];
+    }>((resolve) => {
+      respond = (landmarks) =>
+        resolve({
+          landmarks,
+          worldLandmarks: landmarks,
+          leftHandLandmarks: hands,
+          leftHandWorldLandmarks: hands,
+          rightHandLandmarks: hands,
+          rightHandWorldLandmarks: hands,
+        });
     }),
   );
   const video = {
@@ -87,7 +103,13 @@ it('tracks automatically on an open preview, timestamps capture before inference
   now = 400;
   await act(async () => respond(points));
   expect(onFrame).toHaveBeenCalledWith(
-    expect.objectContaining({ time: 0.1, angle: 90, landmarks: points }),
+    expect.objectContaining({
+      time: 0.1,
+      angle: 90,
+      landmarks: points,
+      leftHandLandmarks: hands,
+      rightHandLandmarks: hands,
+    }),
     100,
   );
   expect(hook.result.current.angle).toBe(90);

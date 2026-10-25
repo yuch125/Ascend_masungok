@@ -28,7 +28,11 @@ export default function ComposeForm({
   initialCaption?: string;
 }) {
   const [content, setContent] = useState(initialCaption),
-    [choices, setChoices] = useState<string[]>([]),
+    [choices, setChoices] = useState<string[]>(() =>
+      session
+        ? ['name', 'date', 'range', ...(previousSession(session, sessions) ? ['difference'] : [])]
+        : [],
+    ),
     [file, setFile] = useState<File | undefined>(() =>
       initialMedia ? videoFile(initialMedia) : undefined,
     ),
@@ -44,6 +48,7 @@ export default function ComposeForm({
     return () => URL.revokeObjectURL(url);
   }, [file]);
   const previous = session ? previousSession(session, sessions) : undefined;
+  const canSubmit = !!content.trim() || !!file || (!!session && choices.length > 0);
   function toggle(name: string) {
     setChoices((c) => (c.includes(name) ? c.filter((v) => v !== name) : [...c, name]));
   }
@@ -52,18 +57,19 @@ export default function ComposeForm({
       <form
         onSubmit={(e) => {
           e.preventDefault();
-          if (!content.trim() && !file) return;
+          const shared = buildSharedRecord(session, sessions, choices);
+          if (!content.trim() && !file && !Object.keys(shared).length) return;
           if (file && file.size > 20 * 1024 * 1024) {
             setError('공유할 영상은 20MB 이하여야 해요. 짧게 촬영해 주세요.');
             return;
           }
-          const shared = buildSharedRecord(session, sessions, choices);
           onSubmit(
             {
               id: createId(),
               userId,
               nickname,
-              content: content.trim() || '운동 영상',
+              content:
+                content.trim() || (file ? '운동 영상을 공유했어요.' : '운동 기록을 공유했어요.'),
               createdAt: new Date().toISOString(),
               shared,
               likes: [],
@@ -164,7 +170,7 @@ export default function ComposeForm({
             ? '이 기기의 데모 피드에 게시됩니다.'
             : '게시하면 선택한 영상과 글이 피드에 공유됩니다.'}
         </p>
-        <button className="primary full-width" disabled={busy || !!error}>
+        <button className="primary full-width" disabled={busy || !!error || !canSubmit}>
           <Heart size={17} />
           {busy ? '게시 중…' : '게시하기'}
         </button>

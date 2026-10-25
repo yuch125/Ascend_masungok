@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { bodyOnlyLandmarks } from './bodyLandmarks';
-import { drawPose, POSE_CONNECTIONS } from './draw';
+import { drawPose, HAND_CONNECTIONS, POSE_CONNECTIONS } from './draw';
 import { measureFrame, summarize } from './math';
 import { exercises } from '../exercise-tracking/exercises';
 import { resampleCaptureFrames } from '../camera/recording';
@@ -15,12 +15,13 @@ const pose = (): Landmark[] =>
     presence: 1,
   }));
 
-describe('body landmarks without face data', () => {
-  it('discards nose, eyes, ears and mouth coordinates without renumbering body joints', () => {
+describe('body landmarks with a nose-only head target', () => {
+  it('keeps the nose but discards eyes, ears and mouth without renumbering body joints', () => {
     const original = pose(),
       points = bodyOnlyLandmarks(original);
     expect(points).toHaveLength(33);
-    expect(points.slice(0, 11)).toEqual(Array(11).fill(null));
+    expect(points[0]).toBe(original[0]);
+    expect(points.slice(1, 11)).toEqual(Array(10).fill(null));
     expect(points.slice(11)).toEqual(original.slice(11));
     expect(points[25]).toBe(original[25]);
     expect(bodyOnlyLandmarks(points)).toBe(points);
@@ -48,12 +49,13 @@ describe('body landmarks without face data', () => {
     const summary = summarize(frames, exercises[0]);
     const capture = resampleCaptureFrames(frames, 1);
     for (const frame of [...summary.frames, ...capture]) {
-      expect(frame.landmarks.slice(0, 11)).toEqual(Array(11).fill(null));
+      expect(frame.landmarks[0]).toEqual(frames[0].landmarks[0]);
+      expect(frame.landmarks.slice(1, 11)).toEqual(Array(10).fill(null));
       expect(frame.landmarks[25]).toEqual(frames[0].landmarks[25]);
     }
     expect(summary.min).toBe(90);
   });
-  it('never draws face dots even when replaying an unsanitized legacy frame', () => {
+  it('draws only the nose from the face when replaying an unsanitized legacy frame', () => {
     const ctx = {
       clearRect: vi.fn(),
       beginPath: vi.fn(),
@@ -71,8 +73,37 @@ describe('body landmarks without face data', () => {
       'left',
       { sourceWidth: 640, sourceHeight: 480, width: 640, height: 480 },
     );
-    expect(ctx.arc).toHaveBeenCalledTimes(22);
+    expect(ctx.arc).toHaveBeenCalledTimes(23);
     expect(ctx.fillText).toHaveBeenCalledWith('90.0°', expect.any(Number), expect.any(Number));
     expect(POSE_CONNECTIONS.every((pair) => pair.every((index) => index >= 11))).toBe(true);
+  });
+  it('draws all detected finger joints and hand connections', () => {
+    const ctx = {
+      clearRect: vi.fn(),
+      beginPath: vi.fn(),
+      moveTo: vi.fn(),
+      lineTo: vi.fn(),
+      stroke: vi.fn(),
+      arc: vi.fn(),
+      fill: vi.fn(),
+      fillText: vi.fn(),
+    };
+    const hands = pose().slice(0, 21);
+    drawPose(
+      ctx as unknown as CanvasRenderingContext2D,
+      {
+        time: 0,
+        angle: 90,
+        landmarks: bodyOnlyLandmarks(pose()),
+        leftHandLandmarks: hands,
+        rightHandLandmarks: hands,
+      },
+      exercises[0],
+      'left',
+      { sourceWidth: 640, sourceHeight: 480, width: 640, height: 480 },
+    );
+    expect(ctx.arc).toHaveBeenCalledTimes(65);
+    expect(HAND_CONNECTIONS).toHaveLength(21);
+    expect(HAND_CONNECTIONS.flat().every((index) => index >= 0 && index <= 20)).toBe(true);
   });
 });

@@ -54,17 +54,68 @@ it('attaches the just-recorded video automatically and toggles optional analysis
     />,
   );
   const checkbox = screen.getByLabelText('관측 각도 범위') as HTMLInputElement;
-  expect(checkbox.checked).toBe(false);
-  await user.click(checkbox);
   expect(checkbox.checked).toBe(true);
   await user.click(checkbox);
   expect(checkbox.checked).toBe(false);
-  await user.click(screen.getByLabelText('운동 이름'));
+  await user.click(checkbox);
+  expect(checkbox.checked).toBe(true);
   expect(submit).not.toHaveBeenCalled();
   await user.click(screen.getByRole('button', { name: '게시하기' }));
-  expect(submit.mock.calls[0][0].shared).toEqual({ exerciseName: '무릎 굽혔다 펴기' });
+  expect(submit.mock.calls[0][0]).toEqual(
+    expect.objectContaining({
+      content: '운동 영상을 공유했어요.',
+      shared: {
+        exerciseName: '무릎 굽혔다 펴기',
+        date: '2026-10-24T00:00:00Z',
+        range: 70,
+      },
+    }),
+  );
   expect(submit.mock.calls[0][1].type).toBe('video/webm');
   expect(submit.mock.calls[0][1].size).toBe(4);
+});
+
+it('allows sharing selected record fields even without a caption or stored video', async () => {
+  const submit = vi.fn(),
+    user = userEvent.setup();
+  const session: Session = {
+    id: 'analysis-only',
+    exerciseId: 'knee',
+    recordedAt: '2026-10-25T00:00:00Z',
+    duration: 2,
+    side: 'right',
+    cameraDirection: '측면',
+    version: '2d-projected-v1',
+    analysis: {
+      min: 85,
+      max: 160,
+      range: 75,
+      validFrames: 20,
+      totalFrames: 20,
+      validRatio: 1,
+      repetitions: 1,
+      frames: [],
+    },
+  };
+  render(
+    <ComposeForm
+      sessions={[session]}
+      session={session}
+      nickname="테스트"
+      userId="local-demo"
+      busy={false}
+      onClose={vi.fn()}
+      onSubmit={submit}
+    />,
+  );
+  await user.click(screen.getByRole('button', { name: '게시하기' }));
+  expect(submit).toHaveBeenCalledWith(
+    expect.objectContaining({
+      content: '운동 기록을 공유했어요.',
+      shared: expect.objectContaining({ range: 75 }),
+    }),
+    undefined,
+  );
 });
 afterEach(() => {
   cleanup();

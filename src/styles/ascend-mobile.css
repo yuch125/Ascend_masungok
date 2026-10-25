@@ -1018,6 +1018,16 @@ body {
   font-size: 15px;
   font-weight: 800;
 }
+.setup-request button:disabled {
+  opacity: 0.45;
+}
+.setup-request-feedback {
+  display: flex;
+  margin-top: 9px;
+  color: var(--ascend-green);
+  font-size: 12px;
+  font-weight: 700;
+}
 .ascend-disclaimer {
   margin: 8px 10px 6px;
   color: #747a72;

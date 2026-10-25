@@ -46,8 +46,10 @@ export type Plan = {
   diagnosisName?: string;
 };
 export type Landmark = { x: number; y: number; z: number; visibility: number; presence?: number };
-/** MediaPipe indices are preserved; excluded face slots 0–10 contain null. */
+/** MediaPipe pose indices are preserved; only the nose (0) and body (11–32) are retained. */
 export type PoseLandmarks = (Landmark | null)[];
+/** MediaPipe Hands indices (0–20), used to recover palm direction and wrist roll. */
+export type HandLandmarks = (Landmark | null)[];
 export type Frame = {
   time: number;
   angle: number | null;
@@ -55,6 +57,10 @@ export type Frame = {
   landmarks: PoseLandmarks;
   /** MediaPipe metric 3D coordinates used for avatar retargeting when available. */
   worldLandmarks?: PoseLandmarks;
+  leftHandLandmarks?: HandLandmarks;
+  leftHandWorldLandmarks?: HandLandmarks;
+  rightHandLandmarks?: HandLandmarks;
+  rightHandWorldLandmarks?: HandLandmarks;
 };
 export type Analysis = {
   min: number;

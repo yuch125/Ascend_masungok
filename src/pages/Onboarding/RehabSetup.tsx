@@ -1,5 +1,5 @@
 import { useRef, useState } from 'react';
-import { ArrowLeft, Minus, Paperclip, Plus } from 'lucide-react';
+import { ArrowLeft, Check, Minus, Paperclip, Plus } from 'lucide-react';
 import AscendBottomNav from '../../components/AscendBottomNav';
 import type { BodyArea, Goal, Plan, SymptomProfile, Tab } from '../../types';
 import { createId } from '../../utils/id';
@@ -58,8 +58,17 @@ export default function RehabSetup({
   const [targetAngle, setTargetAngle] = useState(initialPlan?.targetAngle ?? 175);
   const [attachment, setAttachment] = useState('');
   const [request, setRequest] = useState(initialPlan?.notes ?? '');
+  const [requestApplied, setRequestApplied] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
   const activity = activities.find((item) => item.id === exerciseId)!;
+
+  const applyRequest = () => {
+    const count = request.match(/주\s*([1-7])\s*(?:일|회)/)?.[1];
+    if (/주말/.test(request)) setDays([5, 6]);
+    else if (/평일/.test(request)) setDays([0, 1, 2, 3, 4]);
+    else if (count) setDays(Array.from({ length: Number(count) }, (_, index) => index));
+    setRequestApplied(true);
+  };
 
   const submit = () => {
     const plan: Plan = {
@@ -361,12 +370,23 @@ export default function RehabSetup({
             <div>
               <input
                 value={request}
-                onChange={(event) => setRequest(event.target.value)}
+                onChange={(event) => {
+                  setRequest(event.target.value);
+                  setRequestApplied(false);
+                }}
                 placeholder="예: 오전 시간대, 주 3일"
                 aria-label="재활 계획 요청 사항"
               />
-              <button type="button">반영</button>
+              <button type="button" disabled={!request.trim()} onClick={applyRequest}>
+                {requestApplied ? <Check size={17} /> : null}
+                {requestApplied ? '반영됨' : '반영'}
+              </button>
             </div>
+            {requestApplied && (
+              <small className="setup-request-feedback" role="status">
+                요청 사항을 계획 메모와 주간 일정에 반영했어요.
+              </small>
+            )}
           </section>
           <p className="ascend-disclaimer">
             진단·처방이 아닌 참고용이에요. 담당 의료진과 상의하세요.
