@@ -1,0 +1,16 @@
+{
+  "id": "/",
+  "name": "Re:Move",
+  "short_name": "Re:Move",
+  "description": "운동 촬영부터 관절 분석과 기록까지, 나의 움직임을 담는 앱",
+  "lang": "ko",
+  "start_url": "/#/home",
+  "scope": "/",
+  "display": "standalone",
+  "display_override": ["standalone"],
+  "orientation": "any",
+  "categories": ["health", "fitness"],
+  "background_color": "#edf5f3",
+  "theme_color": "#087f75",
+  "icons": [{ "src": "/app-icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }, { "src": "/app-icon-192.png", "sizes": "192x192", "type": "image/png" }, { "src": "/app-icon-512.png", "sizes": "512x512", "type": "image/png" }, { "src": "/apple-touch-icon.png", "sizes": "180x180", "type": "image/png" }]
+}

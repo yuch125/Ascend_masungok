@@ -1,0 +1,227 @@
+/* Safari safe areas and touch targets also apply in Add to Home Screen mode. */
+.header-install {
+  color: #278e7c;
+}
+.install-app-intro {
+  text-align: center;
+  padding: 12px 0 22px;
+}
+.install-app-intro img {
+  border-radius: 18px;
+  margin: 0 auto 14px;
+}
+.install-app-intro h3 {
+  font-size: 19px;
+  color: #245968;
+  margin: 0 0 9px;
+}
+.install-app-intro p,
+.install-app-note {
+  font-size: 12px;
+  line-height: 1.8;
+  color: #78969c;
+}
+.install-app-steps {
+  padding: 0;
+  margin: 8px 0 20px;
+  list-style: none;
+  display: grid;
+  gap: 20px;
+}
+.install-app-steps li {
+  display: flex;
+  gap: 14px;
+  align-items: flex-start;
+}
+.install-app-steps li > span,
+.install-app-steps li > svg {
+  width: 23px;
+  flex: 0 0 23px;
+  color: #169b83;
+  text-align: center;
+  font-weight: 700;
+}
+.install-app-steps strong {
+  display: block;
+  font-size: 14px;
+  color: #345f6c;
+}
+.install-app-steps small {
+  display: block;
+  font-size: 11px;
+  color: #78969c;
+  line-height: 1.7;
+  margin-top: 5px;
+}
+.install-app-note {
+  margin: 0 0 18px;
+}
+.mobile-product .topbar {
+  height: calc(74px + env(safe-area-inset-top));
+  padding-top: env(safe-area-inset-top);
+}
+.mobile-product .bottom-nav {
+  padding-bottom: max(10px, env(safe-area-inset-bottom));
+}
+.capture-app {
+  height: 100vh;
+  height: 100dvh;
+}
+.camera-app-header {
+  padding-left: max(18px, env(safe-area-inset-left));
+  padding-right: max(18px, env(safe-area-inset-right));
+}
+.camera-app-controls {
+  padding-left: max(22px, env(safe-area-inset-left));
+  padding-right: max(22px, env(safe-area-inset-right));
+}
+.modal {
+  -webkit-overflow-scrolling: touch;
+}
+button,
+a,
+input,
+select,
+textarea {
+  -webkit-tap-highlight-color: transparent;
+}
+button,
+a {
+  touch-action: manipulation;
+}
+input:not([type='checkbox']),
+select,
+textarea {
+  font-size: 16px;
+}
+
+@media (min-width: 600px) {
+  .mobile-product {
+    max-width: 760px;
+  }
+  .mobile-product .bottom-nav {
+    width: min(100%, 760px);
+  }
+  .mobile-product main {
+    padding-left: 28px;
+    padding-right: 28px;
+  }
+  .mobile-product {
+    --page-gutter: 28px;
+  }
+  .mobile-product .topbar {
+    padding-left: 28px;
+    padding-right: 28px;
+  }
+  .clean-home-heading h1 {
+    font-size: 26px;
+  }
+  .clean-home .latest-analysis {
+    padding: 20px;
+  }
+  .clean-home .latest-analysis .video-stage {
+    height: min(52dvh, 600px);
+  }
+  .clean-home .latest-analysis .section-heading h2,
+  .section-heading h2 {
+    font-size: 17px;
+  }
+  .reference-exercise-row {
+    padding: 15px;
+    min-height: 100px;
+  }
+  .reference-exercise-row h3 {
+    font-size: 17px;
+  }
+  .reference-exercise-row p,
+  .reference-exercise-row .row-start {
+    font-size: 13px;
+  }
+  .social-heading h1 {
+    font-size: 26px;
+  }
+  .social-page .post-content {
+    font-size: 16px;
+  }
+  .mobile-product .bottom-nav > button {
+    font-size: 12px;
+    min-height: 52px;
+  }
+  .modal,
+  .modal.wide {
+    width: min(620px, calc(100vw - 48px));
+    padding: 28px;
+  }
+  .camera-exercise-options > button {
+    min-height: 88px;
+  }
+  .camera-exercise-options strong {
+    font-size: 16px;
+  }
+  .camera-exercise-options span,
+  .camera-picker-note {
+    font-size: 13px;
+  }
+  .camera-exercise-title strong {
+    font-size: 19px;
+  }
+  .camera-exercise-title > span,
+  .camera-mode-label {
+    font-size: 13px;
+  }
+  .camera-guidance > button,
+  .camera-guidance > span {
+    min-height: 44px;
+    font-size: 13px;
+  }
+  .camera-live-badges > span {
+    font-size: 13px;
+  }
+  .camera-live-badges > strong {
+    font-size: 19px;
+  }
+  .capture-share-actions > button {
+    min-height: 50px;
+    font-size: 15px;
+  }
+}
+
+@media (orientation: landscape) and (max-height: 650px) {
+  .camera-app-controls {
+    left: auto;
+    width: 190px;
+    top: 96px;
+    justify-content: flex-end;
+    padding: 16px max(18px, env(safe-area-inset-right)) max(16px, env(safe-area-inset-bottom));
+    background: linear-gradient(90deg, transparent, #06120dcc);
+  }
+  .camera-shutter-row {
+    flex-direction: column;
+    gap: 14px;
+  }
+  .camera-guidance {
+    flex-wrap: wrap;
+    gap: 4px;
+  }
+  .camera-app-controls .camera-mode-label {
+    display: none;
+  }
+  .camera-live-badges {
+    right: 190px;
+  }
+  .capture-review-player {
+    right: 260px;
+    bottom: env(safe-area-inset-bottom);
+  }
+  .capture-review-controls {
+    left: auto;
+    top: 80px;
+    width: 260px;
+    justify-content: center;
+    padding: 15px;
+    border-top: 0;
+  }
+  .capture-share-actions {
+    flex-wrap: wrap;
+  }
+}
