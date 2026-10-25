@@ -1301,6 +1301,17 @@ body {
   font-size: 12px;
 }
 
+.pose-interaction-hint {
+  margin: -2px 0 1px;
+  padding: 9px 12px;
+  border-radius: 12px;
+  background: #eef3df;
+  color: #5d705f;
+  font-size: 11px;
+  line-height: 1.45;
+  text-align: center;
+}
+
 .pose-view-switch {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
@@ -1362,7 +1373,7 @@ body {
 .pose-review-panel .pose-avatar,
 .pose-review-loading {
   width: 100%;
-  height: 280px;
+  height: clamp(440px, 52vw, 590px);
   border-radius: 15px;
   box-shadow: none;
 }
@@ -1485,12 +1496,19 @@ body {
   }
   .pose-review-panel .pose-avatar,
   .pose-review-loading {
-    height: 235px;
+    height: min(56dvh, 410px);
   }
   .animation-transport > button:not(.animation-play):first-child {
     display: none;
   }
   .animation-transport label > span {
     display: none;
+  }
+}
+
+@media (min-width: 371px) and (max-width: 720px) {
+  .pose-review-panel .pose-avatar,
+  .pose-review-loading {
+    height: min(60dvh, 470px);
   }
 }

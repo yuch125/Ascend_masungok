@@ -149,6 +149,7 @@ export default function PoseKeyframeReview({
   const [playing, setPlaying] = useState(false);
   const [speed, setSpeed] = useState(1);
   const [view, setView] = useState<PoseAvatarView>('angle');
+  const [viewResetKey, setViewResetKey] = useState(0);
   const target =
     targetAngle ?? (exercise.id === 'knee' ? 175 : exercise.id === 'elbow' ? 165 : 150);
   const index = useMemo(() => {
@@ -202,13 +203,20 @@ export default function PoseKeyframeReview({
               type="button"
               key={name}
               className={view === name ? 'selected' : ''}
-              onClick={() => setView(name)}
+              onClick={() => {
+                setView(name);
+                setViewResetKey((value) => value + 1);
+              }}
             >
               {{ front: '정면', side: '측면', back: '후면', angle: '사선' }[name]}
             </button>
           ))}
         </div>
       </div>
+      <p className="pose-interaction-hint">
+        모델을 드래그해 회전하고 휠 또는 두 손가락으로 확대·축소하세요. 프리셋을 다시 누르면 해당
+        시점으로 돌아갑니다.
+      </p>
 
       <div className="pose-review-grid">
         <div className="pose-review-panel">
@@ -223,6 +231,7 @@ export default function PoseKeyframeReview({
               side={session.side}
               mirrored={session.mirrored ?? false}
               view={view}
+              viewResetKey={viewResetKey}
               hideChrome
             />
           </Suspense>
@@ -239,6 +248,7 @@ export default function PoseKeyframeReview({
               side={session.side}
               mirrored={session.mirrored ?? false}
               view={view}
+              viewResetKey={viewResetKey}
               hideChrome
             />
           </Suspense>
