@@ -2,10 +2,12 @@ import { describe, expect, it } from 'vitest';
 import * as THREE from 'three';
 import type { Frame, HandLandmarks, Landmark } from '../types';
 import {
+  estimateBodyYaw,
   getHandOrientation,
   HUMAN_HAND_PALM_NORMAL_AXIS,
   HUMAN_HAND_THUMB_AXIS,
   isBilateralSquatBend,
+  landmarkAngle3D,
   modelSideForDisplay,
   resolveHandLandmarks,
   stabilizeLegFromImage,
@@ -75,6 +77,27 @@ describe('3D avatar retargeting constraints', () => {
     expect(isBilateralSquatBend(164, 166)).toBe(true);
     expect(isBilateralSquatBend(160, 176)).toBe(false);
     expect(isBilateralSquatBend(null, 160)).toBe(false);
+  });
+
+  it('normalizes the measured diagonal body axis instead of assuming a fixed camera angle', () => {
+    const world: (Landmark | null)[] = Array(33).fill(null);
+    world[23] = landmark(0.35, 0, -0.35);
+    world[24] = landmark(-0.35, 0, 0.35);
+    world[11] = landmark(0.4, -0.8, -0.4);
+    world[12] = landmark(-0.4, -0.8, 0.4);
+    const yaw = estimateBodyYaw(
+      { time: 0, angle: null, landmarks: [], worldLandmarks: world },
+      false,
+    );
+    expect(yaw).toBeCloseTo(Math.PI / 4, 5);
+  });
+
+  it('uses world depth when measuring a knee in a diagonal capture', () => {
+    const world: (Landmark | null)[] = Array(33).fill(null);
+    world[23] = landmark(0, 1, 0);
+    world[25] = landmark(0, 0, 0);
+    world[27] = landmark(0, 0, 1);
+    expect(landmarkAngle3D(world, [23, 25, 27])).toBeCloseTo(90, 5);
   });
 
   it('maps MediaPipe thumb sides to the verified left and right model-hand structure', () => {

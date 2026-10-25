@@ -9,9 +9,9 @@ export const exercises: Exercise[] = [
     instructions: [
       '안정적인 지지대를 잡고 편안히 서세요.',
       '의료진이 안내한 범위 안에서 무릎을 천천히 굽혔다 펴세요.',
-      '측정할 쪽의 엉덩이·무릎·발목이 모두 보이게 촬영하세요.',
+      '사선에서 양쪽 엉덩이·무릎·발목이 모두 보이게 촬영하세요.',
     ],
-    cameraDirection: '측면',
+    cameraDirection: '사선',
     precautions:
       '균형을 잡을 수 있는 지지대를 사용하세요. 통증이 생기면 중단하고 의료진과 상담하세요.',
     referenceUrl: 'https://www.orthoinfo.org/recovery/knee-conditioning-program/',
@@ -47,11 +47,11 @@ export const exercises: Exercise[] = [
     bodyPart: '팔꿈치',
     duration: '약 2분',
     instructions: [
-      '상체를 편안히 유지하고 측정할 팔을 옆에 두세요.',
+      '상체를 편안히 유지하고 측정할 팔이 정면에서 보이게 두세요.',
       '의료진이 안내한 범위 안에서 팔꿈치를 굽혔다 펴세요.',
-      '측면에서 어깨·팔꿈치·손목이 모두 보이게 촬영하세요.',
+      '정면에서 어깨·팔꿈치·손목이 모두 보이게 촬영하세요.',
     ],
-    cameraDirection: '측면',
+    cameraDirection: '정면',
     precautions: '무게와 저항은 임의로 추가하지 마세요. 통증이나 불편함이 생기면 중단하세요.',
     referenceUrl:
       'https://www.orthoinfo.org/recovery/rotator-cuff-and-shoulder-conditioning-program/',

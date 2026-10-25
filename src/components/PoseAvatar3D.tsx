@@ -74,7 +74,10 @@ function feedback(frame: Frame | undefined, exercise: Exercise) {
   if (!frame?.landmarks.length)
     return { tone: 'quiet', text: '랜드마크를 인식하면 아바타가 움직입니다.' };
   if (frame.angle === null || !range)
-    return { tone: 'quiet', text: '측면 또는 전신이 보이도록 카메라 위치를 조정해 주세요.' };
+    return {
+      tone: 'quiet',
+      text: `${exercise.cameraDirection}에서 전신이 보이도록 조정해 주세요.`,
+    };
   if (frame.angle < range[0])
     return {
       tone: 'warn',
@@ -128,6 +131,35 @@ function midpoint(a: PosePoint | null, b: PosePoint | null): PosePoint | null {
         position: a.position.clone().add(b.position).multiplyScalar(0.5),
         confidence: Math.min(a.confidence, b.confidence),
       }
+    : null;
+}
+
+function rotatePosePoint(value: PosePoint | null, yaw: number) {
+  if (!value || yaw === 0) return value;
+  value.position.applyAxisAngle(new THREE.Vector3(0, 1, 0), yaw);
+  return value;
+}
+
+/** Rotate a diagonal lower-body capture back to HUMAN.fbx's body-local axes. */
+export function estimateBodyYaw(frame: Frame | undefined, mirrored: boolean) {
+  const useWorld = !!frame?.worldLandmarks?.length;
+  const landmarks = useWorld ? (frame?.worldLandmarks ?? []) : (frame?.landmarks ?? []);
+  const axes = [
+    [23, 24],
+    [11, 12],
+  ].flatMap(([leftIndex, rightIndex]) => {
+    const left = point(landmarks, leftIndex, mirrored, useWorld);
+    const right = point(landmarks, rightIndex, mirrored, useWorld);
+    if (!left || !right) return [];
+    const lateral = left.position.clone().sub(right.position);
+    lateral.y = 0;
+    if (mirrored) lateral.negate();
+    return lateral.lengthSq() > 1e-7 ? [lateral.normalize()] : [];
+  });
+  if (!axes.length) return null;
+  const lateral = axes.reduce((sum, axis) => sum.add(axis), new THREE.Vector3()).normalize();
+  return Number.isFinite(lateral.x) && Number.isFinite(lateral.z)
+    ? Math.atan2(lateral.z, lateral.x)
     : null;
 }
 
@@ -221,10 +253,10 @@ export function resolveHandLandmarks(
   return candidates.find((candidate) => candidate.declaredSide === side) ?? null;
 }
 
-function getPose(frame: Frame | undefined, mirrored: boolean) {
+function getPose(frame: Frame | undefined, mirrored: boolean, yaw = 0) {
   const useWorld = !!frame?.worldLandmarks?.length;
   const landmarks = useWorld ? (frame?.worldLandmarks ?? []) : (frame?.landmarks ?? []);
-  const p = (index: number) => point(landmarks, index, mirrored, useWorld);
+  const p = (index: number) => rotatePosePoint(point(landmarks, index, mirrored, useWorld), yaw);
   const leftHip = p(23),
     rightHip = p(24),
     leftShoulder = p(11),
@@ -246,12 +278,14 @@ export function getHandOrientation(
   frame: Frame | undefined,
   side: 'left' | 'right',
   mirrored: boolean,
+  yaw = 0,
 ): HandOrientation | null {
   const resolved = resolveHandLandmarks(frame, side);
   if (!resolved) return null;
   const useWorld = !!resolved.world.length;
   const landmarks = useWorld ? resolved.world : resolved.image;
-  const p = (index: number) => point(landmarks, index, mirrored, useWorld, true);
+  const p = (index: number) =>
+    rotatePosePoint(point(landmarks, index, mirrored, useWorld, true), yaw);
   const wrist = p(0);
   const indexMcp = p(5);
   const middleMcp = p(9);
@@ -360,6 +394,20 @@ export function landmarkAngle(
   if (!a || !b || !c || Math.min(a.visibility, b.visibility, c.visibility) < 0.55) return null;
   const ab = new THREE.Vector2(a.x - b.x, a.y - b.y);
   const cb = new THREE.Vector2(c.x - b.x, c.y - b.y);
+  if (ab.lengthSq() < 1e-7 || cb.lengthSq() < 1e-7) return null;
+  return THREE.MathUtils.radToDeg(ab.angleTo(cb));
+}
+
+export function landmarkAngle3D(
+  landmarks: (Landmark | null)[],
+  [aIndex, bIndex, cIndex]: [number, number, number],
+) {
+  const a = landmarks[aIndex];
+  const b = landmarks[bIndex];
+  const c = landmarks[cIndex];
+  if (!a || !b || !c || Math.min(a.visibility, b.visibility, c.visibility) < 0.55) return null;
+  const ab = new THREE.Vector3(a.x - b.x, a.y - b.y, a.z - b.z);
+  const cb = new THREE.Vector3(c.x - b.x, c.y - b.y, c.z - b.z);
   if (ab.lengthSq() < 1e-7 || cb.lengthSq() < 1e-7) return null;
   return THREE.MathUtils.radToDeg(ab.angleTo(cb));
 }
@@ -593,6 +641,8 @@ export function PoseAvatar3D({
       },
     };
     let observedFrameTime = Number.NaN;
+    let filteredBodyYaw = 0;
+    let hasBodyYaw = false;
     let avatarRoot: THREE.Group | undefined;
     const avatarBasePosition = new THREE.Vector3();
     const groundMarkers = new Map<'left' | 'right', THREE.Object3D>();
@@ -904,11 +954,27 @@ export function PoseAvatar3D({
     resize();
     let animation = 0;
     const draw = () => {
-      const pose = getPose(frameRef.current, mirrored);
       const nextTime = frameRef.current?.time;
       const isNewLandmarkFrame = nextTime !== undefined && nextTime !== observedFrameTime;
       if (isNewLandmarkFrame) observedFrameTime = nextTime;
       const sampleTime = nextTime ?? observedFrameTime;
+      if (exercise.id === 'knee') {
+        const measuredYaw = estimateBodyYaw(frameRef.current, mirrored);
+        if (measuredYaw !== null) {
+          if (!hasBodyYaw) {
+            filteredBodyYaw = measuredYaw;
+            hasBodyYaw = true;
+          } else if (isNewLandmarkFrame) {
+            const difference = Math.atan2(
+              Math.sin(measuredYaw - filteredBodyYaw),
+              Math.cos(measuredYaw - filteredBodyYaw),
+            );
+            filteredBodyYaw += difference * 0.24;
+          }
+        }
+      }
+      const poseYaw = exercise.id === 'knee' && hasBodyYaw ? filteredBodyYaw : 0;
+      const pose = getPose(frameRef.current, mirrored, poseYaw);
       apply('spine', pose.hips, pose.chest, isNewLandmarkFrame, sampleTime);
       apply('neck', pose.neck, pose.head, isNewLandmarkFrame, sampleTime);
       // The selfie preview is a mirror. Swap model sides here so raising the arm on the
@@ -920,8 +986,13 @@ export function PoseAvatar3D({
       // Knee flexion and floor support are intentionally independent: image-space
       // angles drive the bones while planted feet determine the avatar root.
       const imageLandmarks = frameRef.current?.landmarks ?? [];
-      const measuredLeftAngle = landmarkAngle(imageLandmarks, [23, 25, 27]);
-      const measuredRightAngle = landmarkAngle(imageLandmarks, [24, 26, 28]);
+      const worldLandmarks = frameRef.current?.worldLandmarks ?? [];
+      const measuredLeftAngle =
+        (exercise.id === 'knee' ? landmarkAngle3D(worldLandmarks, [23, 25, 27]) : null) ??
+        landmarkAngle(imageLandmarks, [23, 25, 27]);
+      const measuredRightAngle =
+        (exercise.id === 'knee' ? landmarkAngle3D(worldLandmarks, [24, 26, 28]) : null) ??
+        landmarkAngle(imageLandmarks, [24, 26, 28]);
       const leftAngle = resolvedLegAngle(legMotion.left, measuredLeftAngle, isNewLandmarkFrame);
       const rightAngle = resolvedLegAngle(legMotion.right, measuredRightAngle, isNewLandmarkFrame);
       const bilateralBend = isBilateralSquatBend(leftAngle, rightAngle);
@@ -935,7 +1006,7 @@ export function PoseAvatar3D({
       apply(`${left}ForeArm`, pose.leftArm[1], pose.leftArm[2], isNewLandmarkFrame, sampleTime);
       applyHand(
         `${left}Hand`,
-        getHandOrientation(frameRef.current, 'left', mirrored),
+        getHandOrientation(frameRef.current, 'left', mirrored, poseYaw),
         pose.leftArm[2],
         pose.leftArm[3],
         isNewLandmarkFrame,
@@ -946,7 +1017,7 @@ export function PoseAvatar3D({
       apply(`${right}ForeArm`, pose.rightArm[1], pose.rightArm[2], isNewLandmarkFrame, sampleTime);
       applyHand(
         `${right}Hand`,
-        getHandOrientation(frameRef.current, 'right', mirrored),
+        getHandOrientation(frameRef.current, 'right', mirrored, poseYaw),
         pose.rightArm[2],
         pose.rightArm[3],
         isNewLandmarkFrame,
@@ -995,7 +1066,7 @@ export function PoseAvatar3D({
       renderer.dispose();
       renderer.domElement.remove();
     };
-  }, [mirrored]);
+  }, [exercise.id, mirrored]);
 
   return (
     <section

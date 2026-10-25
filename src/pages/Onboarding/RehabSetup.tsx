@@ -346,7 +346,7 @@ export default function RehabSetup({
               <span>목표 각도</span>
             </div>
             <div className="plan-table">
-              <strong>스쿼트 · 측면</strong>
+              <strong>스쿼트 · 사선</strong>
               <strong>주 3회</strong>
               <strong>2×8</strong>
               <strong>{targetAngle}°</strong>
